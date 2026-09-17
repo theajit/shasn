@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { io, type Socket } from "socket.io-client";
 import type { Action, PlayerColor } from "@/engine/types";
 import type { RoomAck, RoomIdentity, RoomSnapshot, StartRoomOptions } from "@/online/types";
+import type { TradeBundle } from "@/engine/types";
 import { useGameStore } from "./gameStore";
 
 type PlayMode = "menu" | "local" | "online";
@@ -20,6 +21,8 @@ interface RoomStore {
   resumeRoom: () => void;
   startRoom: (options: StartRoomOptions) => void;
   dispatchOnline: (action: Action) => void;
+  proposeTrade: (partnerId: string, give: TradeBundle, receive: TradeBundle) => void;
+  respondToTrade: (tradeId: string, accept: boolean) => void;
   leaveRoom: () => void;
 }
 
@@ -89,6 +92,20 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     if (!identity) return;
     getSocket().emit("game:action", { roomCode: identity.roomCode, playerId: identity.playerId, action }, (ack: RoomAck) => {
       if (!ack.ok) useGameStore.getState().setError(ack.error ?? "Action rejected");
+    });
+  },
+  proposeTrade: (partnerId, give, receive) => {
+    const identity = get().identity;
+    if (!identity) return;
+    getSocket().emit("trade:propose", { roomCode: identity.roomCode, playerId: identity.playerId, partnerId, give, receive }, (ack: RoomAck) => {
+      if (!ack.ok) useGameStore.getState().setError(ack.error ?? "Could not propose trade");
+    });
+  },
+  respondToTrade: (tradeId, accept) => {
+    const identity = get().identity;
+    if (!identity) return;
+    getSocket().emit("trade:respond", { roomCode: identity.roomCode, playerId: identity.playerId, tradeId, accept }, (ack: RoomAck) => {
+      if (!ack.ok) useGameStore.getState().setError(ack.error ?? "Could not respond to trade");
     });
   },
   leaveRoom: () => {

@@ -1,4 +1,12 @@
-import type { Action, GameState, PlayerColor, PlayerId } from "@/engine/types";
+import type { Action, GameState, PlayerColor, PlayerId, TradeBundle } from "@/engine/types";
+
+export interface PendingTrade {
+  id: string;
+  proposerId: PlayerId;
+  partnerId: PlayerId;
+  give: TradeBundle;
+  receive: TradeBundle;
+}
 
 export interface RoomPlayer {
   id: PlayerId;
@@ -12,6 +20,7 @@ export interface RoomSnapshot {
   code: string;
   players: RoomPlayer[];
   game: GameState | null;
+  pendingTrade: PendingTrade | null;
 }
 
 export interface RoomIdentity {
@@ -35,4 +44,19 @@ export interface ClientActionPayload {
   roomCode: string;
   playerId: PlayerId;
   action: Action;
+}
+
+export interface TradeProposalPayload {
+  roomCode: string;
+  playerId: PlayerId;
+  partnerId: PlayerId;
+  give: TradeBundle;
+  receive: TradeBundle;
+}
+
+export interface TradeResponsePayload {
+  roomCode: string;
+  playerId: PlayerId;
+  tradeId: string;
+  accept: boolean;
 }

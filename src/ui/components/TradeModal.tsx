@@ -12,6 +12,7 @@ import { RESOURCES } from "@/engine/types";
 import { useDispatch } from "@/ui/hooks/useDispatch";
 import { activePlayer } from "@/engine/selectors";
 import { CONSPIRACY_CARDS } from "@/data/cards/conspiracy";
+import { useRoomStore } from "@/store/roomStore";
 import {
   RESOURCE_BG,
   RESOURCE_COLOR,
@@ -33,6 +34,8 @@ const ZERO_RES: Record<Resource, number> = {
 
 export default function TradeModal({ state, onClose }: Props) {
   const dispatch = useDispatch();
+  const mode = useRoomStore((s) => s.mode);
+  const proposeTrade = useRoomStore((s) => s.proposeTrade);
   const active = activePlayer(state);
   const opponents = state.players.filter((p) => p.id !== active.id);
 
@@ -137,12 +140,13 @@ export default function TradeModal({ state, onClose }: Props) {
             type="button"
             disabled={!canTrade}
             onClick={() => {
-              dispatch({ t: "trade", withPlayerId: opp.id, give, receive });
+              if (mode === "online") proposeTrade(opp.id, give, receive);
+              else dispatch({ t: "trade", withPlayerId: opp.id, give, receive });
               onClose();
             }}
             className="px-3 py-1 rounded bg-blue-700 hover:bg-blue-600 disabled:opacity-40"
           >
-            Propose & execute
+            {mode === "online" ? "Send proposal" : "Propose & execute"}
           </button>
         </div>
       </div>
