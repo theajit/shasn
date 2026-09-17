@@ -124,6 +124,8 @@ export default function Game() {
   const active = activePlayer(state);
   const overCap = totalResources(active) > active.resourceCap;
   const inActions = state.phase === "actions";
+  const headlinesComplete = state.phase === "headlines" && state.pendingHeadlines === 0;
+  const canEndTurn = !overCap && ((inActions && pending === 0) || headlinesComplete);
 
   // ---- Drag-and-drop voter placement -------------------------------------
 
@@ -378,10 +380,12 @@ export default function Game() {
           <button
             type="button"
             onClick={() => dispatch({ t: "endTurn" })}
-            disabled={!(inActions && pending === 0 && !overCap)}
+            disabled={!canEndTurn}
             title={
-              !inActions
-                ? "Not in the actions phase"
+              headlinesComplete
+                ? "Continue to the next player"
+                : !inActions
+                ? "Resolve the current headline first"
                 : pending > 0
                 ? "Place all pending voters first"
                 : overCap
@@ -390,7 +394,7 @@ export default function Game() {
             }
             className="px-3 py-1.5 rounded-md bg-blue-700 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-white text-sm font-semibold"
           >
-            End Turn
+            {headlinesComplete ? "Next Player" : "End Turn"}
           </button>
         </div>
       </div>
