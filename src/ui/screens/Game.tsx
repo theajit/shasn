@@ -518,7 +518,7 @@ export default function Game() {
 
       {/* Error toast */}
       {lastError ? (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-red-700/90 border border-red-500 text-white px-4 py-2 rounded shadow-lg max-w-md text-sm z-40">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-red-700/95 border border-red-500 text-white px-4 py-2 rounded shadow-2xl max-w-md text-sm z-[80]">
           {lastError}
           <button
             type="button"
