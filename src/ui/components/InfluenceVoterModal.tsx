@@ -13,6 +13,7 @@ import {
   RESOURCE_LABEL,
   ResourceCoin,
 } from "./ResourceTrack";
+import { discountedVoterCost } from "@/engine/rules/voterCards";
 
 interface Props {
   state: GameState;
@@ -26,15 +27,13 @@ export default function InfluenceVoterModal({ state, openIdx, onClose }: Props) 
   const cardId = state.openVoterCards[openIdx];
   const card = useMemo(() => VOTER_CARDS.find((c) => c.id === cardId), [cardId]);
 
-  const baseCost = useMemo<Record<Resource, number>>(() => {
-    const out: Record<Resource, number> = { funds: 0, clout: 0, media: 0, trust: 0 };
-    if (card) {
-      for (const r of RESOURCES) out[r] = card.cost[r] ?? 0;
-    }
-    return out;
-  }, [card]);
-
-  const anyNeeded = card?.cost.any ?? 0;
+  const helpingHands = state.powerUsage["idealist.3.discountPending"] ?? 0;
+  const discountedCost = useMemo(
+    () => card ? discountedVoterCost(card, helpingHands) : null,
+    [card, helpingHands],
+  );
+  const baseCost = discountedCost?.resources ?? { funds: 0, clout: 0, media: 0, trust: 0 };
+  const anyNeeded = discountedCost?.any ?? 0;
   const [anyAlloc, setAnyAlloc] = useState<Record<Resource, number>>({
     funds: 0,
     clout: 0,
@@ -75,6 +74,12 @@ export default function InfluenceVoterModal({ state, openIdx, onClose }: Props) 
             <span className="text-neutral-300 font-bold">{anyNeeded}? (any)</span>
           ) : null}
         </div>
+
+        {discountedCost && discountedCost.usedDiscount > 0 ? (
+          <div className="rounded border border-emerald-800/60 bg-emerald-950/30 px-3 py-2 text-xs text-emerald-300">
+            Helping Hands applied: −{discountedCost.usedDiscount} resource{discountedCost.usedDiscount === 1 ? "" : "s"}. The cost shown above is already discounted.
+          </div>
+        ) : null}
 
         {anyNeeded > 0 ? (
           <div className="space-y-2">

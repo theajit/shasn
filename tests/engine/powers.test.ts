@@ -186,6 +186,23 @@ describe("powers", () => {
     expect(inf.state.players[0].resources.funds).toBe(2); // unchanged from start
   });
 
+  it("Idealist L3 Helping Hands discounts a typed cost before any cost", () => {
+    let s = freshState();
+    s.phase = "actions";
+    grantIdeologyCards(s, "ide", 3);
+    const powered = applyAction(s, {
+      t: "useIdeologuePower", ideologue: "idealist", level: 3, params: {},
+    });
+    if (!powered.ok) throw new Error(powered.error);
+    powered.state.openVoterCards[1] = "v2-a";
+    // v2-a costs 1 funds + 1 clout. The discount removes the funds
+    // requirement first, leaving exactly 1 clout to pay.
+    const influenced = applyAction(powered.state, {
+      t: "influenceVoterCard", openIdx: 1, payment: { clout: 1 },
+    });
+    expect(influenced.ok).toBe(true);
+  });
+
   it("Idealist L5 Tough Love: convert 2 opponent voters in same zone", () => {
     let s = freshState();
     s.phase = "actions";

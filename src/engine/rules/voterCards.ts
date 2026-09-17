@@ -203,6 +203,33 @@ function overCap(state: GameState): boolean {
 interface PaymentValidation { ok: true; usedDiscount: number; }
 interface PaymentInvalid    { ok: false; error: string; }
 
+export interface DiscountedVoterCost {
+  resources: Record<Resource, number>;
+  any: number;
+  usedDiscount: number;
+}
+
+export function discountedVoterCost(card: VoterCard, discount: number): DiscountedVoterCost {
+  const resources: Record<Resource, number> = { funds: 0, clout: 0, media: 0, trust: 0 };
+  for (const resource of RESOURCES) resources[resource] = card.cost[resource] ?? 0;
+  let any = card.cost.any ?? 0;
+  let remaining = Math.max(0, discount);
+  let usedDiscount = 0;
+  for (const resource of RESOURCES) {
+    if (remaining <= 0) break;
+    const applied = Math.min(resources[resource], remaining);
+    resources[resource] -= applied;
+    remaining -= applied;
+    usedDiscount += applied;
+  }
+  if (remaining > 0) {
+    const applied = Math.min(any, remaining);
+    any -= applied;
+    usedDiscount += applied;
+  }
+  return { resources, any, usedDiscount };
+}
+
 function validatePayment(
   card: VoterCard,
   payment: Partial<Record<Resource, number>>,
@@ -211,34 +238,9 @@ function validatePayment(
   // Compute total cost; specific resource buckets must be at least the
   // amounts the card requires (after subtracting discount which the player
   // may direct at any resource). `any` can be paid with any resource.
-  const need: Partial<Record<Resource, number>> = {};
-  for (const r of RESOURCES) {
-    if (card.cost[r]) need[r] = card.cost[r];
-  }
-  const anyNeed = card.cost.any ?? 0;
-
-  // Apply discount: player chooses how to allocate up to `discount` across
-  // resource costs. For simplicity we try to maximize discount usage by
-  // applying it first to specific costs, then to `any`.
-  let remDiscount = discount;
-  let usedDiscount = 0;
-  for (const r of RESOURCES) {
-    if (remDiscount <= 0) break;
-    const n = need[r] ?? 0;
-    const apply = Math.min(n, remDiscount);
-    if (apply > 0) {
-      need[r] = n - apply;
-      remDiscount -= apply;
-      usedDiscount += apply;
-    }
-  }
-  let anyRemain = anyNeed;
-  if (remDiscount > 0 && anyRemain > 0) {
-    const apply = Math.min(anyRemain, remDiscount);
-    anyRemain -= apply;
-    remDiscount -= apply;
-    usedDiscount += apply;
-  }
+  const discounted = discountedVoterCost(card, discount);
+  const need = discounted.resources;
+  const anyRemain = discounted.any;
 
   // Now check the payment covers `need` exactly for typed resources and
   // covers the remaining `any` from total leftover.
@@ -255,5 +257,5 @@ function validatePayment(
   if (extraForAny > anyRemain) {
     return { ok: false, error: `Payment over-pays by ${extraForAny - anyRemain} (engine requires exact)` };
   }
-  return { ok: true, usedDiscount };
+  return { ok: true, usedDiscount: discounted.usedDiscount };
 }
