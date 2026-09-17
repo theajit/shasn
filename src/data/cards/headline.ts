@@ -34,7 +34,7 @@ export const HEADLINE_CARDS: HeadlineCard[] = [
       "A unifying day of marches lifts every campaign. Every player gains 1 Trust.",
     effect: {
       kind: "globalResourceShift",
-      params: { resources: { trust: 1 } },
+      params: { delta: { trust: 1 } },
     },
   },
   {
