@@ -15,6 +15,7 @@ import HqMat from "@/ui/components/HqMat";
 import PlayerSummary from "@/ui/components/PlayerSummary";
 import IdeologyCollection from "@/ui/components/IdeologyCollection";
 import ConspiracyBuyPanel from "@/ui/components/ConspiracyBuyPanel";
+import BuyConspiracyModal from "@/ui/components/BuyConspiracyModal";
 import DeckStats from "@/ui/components/DeckStats";
 import ActionBar from "@/ui/components/ActionBar";
 import IdeologyCardModal from "@/ui/components/IdeologyCardModal";
@@ -36,6 +37,7 @@ type ModalKind =
   | { kind: "influence"; openIdx: 0 | 1 | 2 }
   | { kind: "gerry" }
   | { kind: "trade" }
+  | { kind: "buyConspiracy" }
   | { kind: "conspiracy"; cardId?: string }
   | { kind: "power"; ideologue: Ideologue; level: 3 | 5 };
 
@@ -428,7 +430,7 @@ export default function Game() {
           <div className="p-3 border-t border-neutral-800 bg-neutral-950">
             <ConspiracyBuyPanel
               state={state}
-              onBuyConspiracy={() => dispatch({ t: "buyConspiracy", payment: {} })}
+              onBuyConspiracy={() => setModal({ kind: "buyConspiracy" })}
               disabled={!inActions}
             />
           </div>
@@ -548,6 +550,9 @@ export default function Game() {
       ) : null}
       {modal?.kind === "trade" ? (
         <TradeModal state={state} onClose={() => setModal(null)} />
+      ) : null}
+      {modal?.kind === "buyConspiracy" ? (
+        <BuyConspiracyModal state={state} onClose={() => setModal(null)} />
       ) : null}
       {modal?.kind === "conspiracy" ? (
         <ConspiracyModal
