@@ -136,11 +136,25 @@ export function resolveHeadlineEffect(
       const tz = params.toZone as string;
       const ts = params.toSlotIdx as number;
       if (!fz || fs === undefined || !tz || ts === undefined) {
+        const hasLegalMove = state.board.zones.some((zone) =>
+          state.zones[zone.id].slots.some((voter, slotIdx) =>
+            Boolean(voter)
+            && voter!.playerId === np.id
+            && !voter!.isMajority
+            && !isVolatileSlot(state, zone.id, slotIdx)
+            && zone.adjacent.some((adjacentId) => state.zones[adjacentId].slots.some((slot) => slot === null)),
+          ),
+        );
+        if (!hasLegalMove) return { ok: true, state };
         return { ok: false, error: "moveVoter: missing params" };
       }
       const fzSt = state.zones[fz];
       const tzSt = state.zones[tz];
       if (!fzSt || !tzSt) return { ok: false, error: "Unknown zone" };
+      const fromZone = state.board.zones.find((zone) => zone.id === fz);
+      if (!fromZone?.adjacent.includes(tz)) {
+        return { ok: false, error: "Target zone must be adjacent" };
+      }
       const v = fzSt.slots[fs];
       if (!v) return { ok: false, error: "No voter at source" };
       if (v.playerId !== np.id) return { ok: false, error: "Not your voter" };
