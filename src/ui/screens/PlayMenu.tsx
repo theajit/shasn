@@ -5,9 +5,10 @@ export default function PlayMenu() {
   const chooseLocal = useRoomStore((state) => state.chooseLocal);
   const resumeRoom = useRoomStore((state) => state.resumeRoom);
   const backToMenu = useRoomStore((state) => state.backToMenu);
-  const chooseOnline = () =>
+  const chooseOnline = (lobbyIntent: "create" | "join") =>
     useRoomStore.setState({
       mode: "online",
+      lobbyIntent,
       snapshot: null,
       identity: null,
       error: null,
@@ -25,11 +26,11 @@ export default function PlayMenu() {
             <span className="mt-2 block text-sm text-neutral-400">One device, 2–5 players in the same place.</span>
             {hasSavedGame() ? <span className="mt-3 block text-xs text-emerald-400">Saved local game available</span> : null}
           </button>
-          <button type="button" onClick={chooseOnline} className="rounded-xl border border-red-900 bg-red-950/30 p-6 text-left hover:border-red-600">
+          <button type="button" onClick={() => chooseOnline("create")} className="rounded-xl border border-red-900 bg-red-950/30 p-6 text-left hover:border-red-600">
             <span className="block text-xl font-bold">Create room</span>
             <span className="mt-2 block text-sm text-neutral-400">Start a private room and invite remote players.</span>
           </button>
-          <button type="button" onClick={chooseOnline} className="rounded-xl border border-red-900 bg-red-950/30 p-6 text-left hover:border-red-600">
+          <button type="button" onClick={() => chooseOnline("join")} className="rounded-xl border border-red-900 bg-red-950/30 p-6 text-left hover:border-red-600">
             <span className="block text-xl font-bold">Join room</span>
             <span className="mt-2 block text-sm text-neutral-400">Enter a room code and join an existing game.</span>
           </button>

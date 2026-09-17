@@ -5,8 +5,10 @@ import type { RoomAck, RoomIdentity, RoomSnapshot, StartRoomOptions } from "@/on
 import { useGameStore } from "./gameStore";
 
 type PlayMode = "menu" | "local" | "online";
+type LobbyIntent = "create" | "join";
 interface RoomStore {
   mode: PlayMode;
+  lobbyIntent: LobbyIntent | null;
   snapshot: RoomSnapshot | null;
   identity: RoomIdentity | null;
   connecting: boolean;
@@ -54,12 +56,13 @@ function acceptAck(ack: RoomAck) {
 
 export const useRoomStore = create<RoomStore>((set, get) => ({
   mode: "menu",
+  lobbyIntent: null,
   snapshot: null,
   identity: null,
   connecting: false,
   error: null,
   chooseLocal: () => set({ mode: "local", error: null }),
-  backToMenu: () => set({ mode: "menu", error: null }),
+  backToMenu: () => set({ mode: "menu", lobbyIntent: null, error: null }),
   createRoom: (name, color) => {
     set({ connecting: true, error: null });
     getSocket().emit("room:create", { name, color }, acceptAck);
@@ -71,7 +74,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   resumeRoom: () => {
     const saved = readIdentity();
     if (!saved) return set({ error: "No saved room session" });
-    set({ mode: "online", identity: saved, connecting: true, error: null });
+    set({ mode: "online", lobbyIntent: null, identity: saved, connecting: true, error: null });
     getSocket().emit("room:resume", saved, acceptAck);
   },
   startRoom: (options) => {
@@ -93,7 +96,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     socket?.disconnect();
     socket = null;
     useGameStore.getState().replaceState(null);
-    set({ mode: "menu", snapshot: null, identity: null, connecting: false, error: null });
+    set({ mode: "menu", lobbyIntent: null, snapshot: null, identity: null, connecting: false, error: null });
   },
 }));
 
