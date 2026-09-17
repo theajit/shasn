@@ -6,10 +6,13 @@ import {
   totalVotersForPlayer,
 } from "@/engine/selectors";
 import PlayerColorSwatch, { PLAYER_COLOR_HEX } from "@/ui/components/PlayerColorSwatch";
+import { useRoomStore } from "@/store/roomStore";
 
 export default function EndGame() {
   const state = useGameStore((s) => s.state)!;
   const clear = useGameStore((s) => s.clear);
+  const mode = useRoomStore((s) => s.mode);
+  const leaveRoom = useRoomStore((s) => s.leaveRoom);
 
   const ranked = useMemo(() => {
     const scores = finalScores(state);
@@ -70,10 +73,10 @@ export default function EndGame() {
 
       <button
         type="button"
-        onClick={() => clear()}
+        onClick={() => mode === "online" ? leaveRoom() : clear()}
         className="mt-6 px-6 py-3 rounded-lg bg-blue-700 hover:bg-blue-600 font-semibold focus:outline-none focus:ring-2 focus:ring-white"
       >
-        Play again
+        {mode === "online" ? "Leave room" : "Play again"}
       </button>
     </div>
   );

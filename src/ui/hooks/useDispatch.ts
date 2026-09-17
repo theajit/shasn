@@ -4,14 +4,18 @@
 import { useCallback } from "react";
 import type { Action } from "@/engine/types";
 import { useGameStore } from "@/store/gameStore";
+import { useRoomStore } from "@/store/roomStore";
 
 export function useDispatch() {
   const dispatch = useGameStore((s) => s.dispatch);
+  const mode = useRoomStore((s) => s.mode);
+  const dispatchOnline = useRoomStore((s) => s.dispatchOnline);
   return useCallback(
     (action: Action) => {
-      dispatch(action);
+      if (mode === "online") dispatchOnline(action);
+      else dispatch(action);
     },
-    [dispatch],
+    [dispatch, dispatchOnline, mode],
   );
 }
 

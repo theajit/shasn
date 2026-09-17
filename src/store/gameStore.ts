@@ -22,6 +22,8 @@ interface GameStore {
   }) => void;
   resume: () => boolean;
   clear: () => void;
+  replaceState: (state: GameState | null) => void;
+  setError: (error: string | null) => void;
   clearError: () => void;
 }
 
@@ -57,6 +59,8 @@ export const useGameStore = create<GameStore>()(
       clear: () => {
         set({ state: null, lastError: null });
       },
+      replaceState: (state) => set({ state, lastError: null }),
+      setError: (lastError) => set({ lastError }),
       clearError: () => set({ lastError: null }),
     }),
     {

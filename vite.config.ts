@@ -4,6 +4,14 @@ import path from "node:path";
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    proxy: {
+      "/socket.io": {
+        target: "http://localhost:3000",
+        ws: true,
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),

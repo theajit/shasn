@@ -1,6 +1,6 @@
 # SHASN Online
 
-A browser-based pass-and-play implementation of the board game **SHASN** (Memesys Lab). One device, two-to-five friends, hot-seat handoff between turns.
+A browser-based implementation of **SHASN** (Memesys Lab). Play pass-and-play on one device or create a private online room for two-to-five remote players.
 
 The full rulebook ships with the build — click the **Rules** tile in the bottom bar to open it.
 
@@ -8,18 +8,19 @@ The full rulebook ships with the build — click the **Rules** tile in the botto
 
 ## Tech stack
 
-- **Vite + React 18 + TypeScript** — SPA, no backend.
+- **Vite + React 18 + TypeScript** for the browser client.
+- **Express + Socket.IO** for server-authoritative online rooms.
 - **Zustand** for game state, with a `persist` middleware that auto-saves to `localStorage` (resume on refresh).
 - **Tailwind CSS v3** for styling. Custom theme pack "Oxblood Noir" (ink / oxblood / sand / stone) lives in `tailwind.config.ts`.
 - **Vitest** for the engine + integration test suite.
 
-No network, no auth, no accounts — everything runs locally.
+Local play still works without an account. Online rooms use an invite code and do not require registration.
 
 ---
 
 ## Prerequisites
 
-- **Node.js** 18 or newer (developed against **v22**).
+- **Node.js 24**.
 - **npm** 10+. `pnpm` and `yarn` work too if you prefer, but this README uses npm.
 
 ---
@@ -37,6 +38,10 @@ That's it. No `.env`, no database, no extra config.
 ---
 
 ## Running it
+
+`npm run dev` starts both the Vite client and the Socket.IO room server. For production, run `npm run build` followed by `npm start`; the server uses `PORT` (default `3000`) and serves the built client from `dist/`.
+
+Online rooms use six-character invite codes and reconnect tokens. No account is required. Rooms are currently ephemeral and are cleared when the server restarts. Set `VITE_ROOM_SERVER_URL` at build time only when the room server is hosted on a different origin.
 
 ### Dev server (hot reload)
 
