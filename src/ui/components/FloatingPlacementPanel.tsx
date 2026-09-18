@@ -17,13 +17,15 @@ interface Props {
   pegs: PendingPeg[];
   draftedPegKeys: Set<string>;
   draggingPegKey: string | null;
+  selectedPegKey: string | null;
   onPegPointerDown: (pegKey: string, e: React.PointerEvent) => void;
+  onPegSelect: (pegKey: string) => void;
   onSave: () => void;
   onReset: () => void;
 }
 
 const FloatingPlacementPanel = forwardRef<HTMLDivElement, Props>(function FloatingPlacementPanel(
-  { pegs, draftedPegKeys, draggingPegKey, onPegPointerDown, onSave, onReset },
+  { pegs, draftedPegKeys, draggingPegKey, selectedPegKey, onPegPointerDown, onPegSelect, onSave, onReset },
   ref,
 ) {
   const total = pegs.length;
@@ -33,7 +35,7 @@ const FloatingPlacementPanel = forwardRef<HTMLDivElement, Props>(function Floati
   return (
     <div
       ref={ref}
-      className="pointer-events-auto bg-neutral-900/95 backdrop-blur border border-amber-700/60 rounded-lg shadow-2xl p-3 w-[280px]"
+      className="pointer-events-auto bg-neutral-900/95 backdrop-blur border border-amber-700/60 rounded-lg shadow-2xl p-2.5 w-[min(280px,calc(100vw-24px))] sm:p-3"
       role="region"
       aria-label="Place your voters in the map"
       // Don't let pointer events here trigger the map's pan/zoom underneath.
@@ -43,7 +45,7 @@ const FloatingPlacementPanel = forwardRef<HTMLDivElement, Props>(function Floati
         Place your voters in the map
       </div>
       <div className="text-[10px] text-neutral-400 mb-2">
-        Drag each peg onto a highlighted cell.{" "}
+        Tap a peg, then tap a highlighted cell. You can also drag.{" "}
         <span className="text-neutral-200 font-semibold">{remaining}</span> /{" "}
         {total} remaining.
       </div>
@@ -68,9 +70,12 @@ const FloatingPlacementPanel = forwardRef<HTMLDivElement, Props>(function Floati
               role="button"
               tabIndex={0}
               onPointerDown={(e) => onPegPointerDown(peg.key, e)}
+              onClick={() => onPegSelect(peg.key)}
               title="Drag onto the map"
               aria-label="Voter peg — drag onto the map"
-              className={`w-5 h-5 rounded-full border border-black/40 inline-block cursor-grab active:cursor-grabbing shadow ring-1 ring-white/25 select-none ${
+              className={`w-8 h-8 sm:w-6 sm:h-6 rounded-full border border-black/40 inline-block cursor-grab active:cursor-grabbing shadow ring-1 select-none ${
+                selectedPegKey === peg.key ? "ring-4 ring-amber-300" : "ring-white/25"
+              } ${
                 isDragging ? "opacity-40" : ""
               }`}
               style={{ backgroundColor: PLAYER_COLOR_HEX[peg.ownerColor] }}

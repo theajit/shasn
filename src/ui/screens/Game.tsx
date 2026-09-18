@@ -2,7 +2,7 @@
 //   [ resizable left sidebar | map | HQ Mat ]
 //   sidebar holds player summaries + active player's ideology collection,
 //   with the Conspiracy/Headline deck panel pinned to the bottom.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { useDispatch, useLastError, useClearError } from "@/ui/hooks/useDispatch";
 import {
@@ -89,6 +89,8 @@ export default function Game({ readOnly = false }: GameProps) {
   const pendingTrade = room?.pendingTrade;
 
   const [modal, setModal] = useState<ModalKind>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [hqOpen, setHqOpen] = useState(false);
 
   // Resizable sidebar width, persisted across reloads.
   const [sidebarWidth, setSidebarWidth] = useState<number>(readSidebarWidth);
@@ -175,6 +177,7 @@ export default function Game({ readOnly = false }: GameProps) {
   // Local draft: { pegKey → cellKey }. Cleared on save / reset / when the
   // engine drains pendingPlacements (after a successful save).
   const [drafts, setDrafts] = useState<Record<PegKey, CellKey>>({});
+  const [selectedPegKey, setSelectedPegKey] = useState<PegKey | null>(null);
   useEffect(() => {
     // If the engine has nothing left to place, the local drafts are stale.
     if (state.pendingPlacements.length === 0 && Object.keys(drafts).length > 0) {
@@ -236,7 +239,10 @@ export default function Game({ readOnly = false }: GameProps) {
   const selectableSlots = useMemo(() => {
     if (readOnly || pegList.length === 0) return undefined;
     const out: Record<string, number[]> = {};
-    pegList.forEach((peg) => {
+    const candidatePegs = selectedPegKey
+      ? pegList.filter((peg) => peg.key === selectedPegKey)
+      : pegList;
+    candidatePegs.forEach((peg) => {
       if (draftedPegKeys.has(peg.key)) return;
       const lockedZone = lockedZoneByBundle[peg.bundleIdx];
       for (const z of state.board.zones) {
@@ -251,7 +257,7 @@ export default function Game({ readOnly = false }: GameProps) {
       }
     });
     return out;
-  }, [readOnly, pegList, draftedPegKeys, draftedCellKeys, lockedZoneByBundle, state.board.zones, state.zones]);
+  }, [readOnly, selectedPegKey, pegList, draftedPegKeys, draftedCellKeys, lockedZoneByBundle, state.board.zones, state.zones]);
 
   // Draft preview pegs for the map overlay.
   const draftPegs = useMemo(() => {
@@ -385,16 +391,36 @@ export default function Game({ readOnly = false }: GameProps) {
       }
     }
     setDrafts({});
+    setSelectedPegKey(null);
   }, [state.pendingPlacements, drafts, dispatch]);
 
-  const resetPlacements = useCallback(() => setDrafts({}), []);
+  const resetPlacements = useCallback(() => {
+    setDrafts({});
+    setSelectedPegKey(null);
+  }, []);
+
+  const selectPeg = useCallback((pegKey: PegKey) => {
+    setSelectedPegKey((current) => current === pegKey ? null : pegKey);
+  }, []);
+
+  const placeSelectedPeg = useCallback((zoneId: string, slotIdx: number) => {
+    if (!selectedPegKey) return;
+    const cellKey = `${zoneId},${slotIdx}`;
+    if (!cellValidForPeg(selectedPegKey, zoneId, slotIdx, cellKey)) return;
+    setDrafts((current) => ({ ...current, [selectedPegKey]: cellKey }));
+    setSelectedPegKey(null);
+  }, [selectedPegKey, cellValidForPeg]);
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col">
+    <div className="h-[100dvh] min-h-0 bg-neutral-950 text-neutral-100 flex flex-col overflow-hidden">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-neutral-800 bg-neutral-900/60">
-        <div className="font-bold">SHASN</div>
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-2 px-2 py-2 sm:px-4 border-b border-neutral-800 bg-neutral-900/60">
+        <div className="hidden font-bold sm:block">SHASN</div>
+        <div className="flex items-center gap-1 sm:hidden">
+          <button type="button" onClick={() => setSidebarOpen(true)} className="rounded border border-neutral-700 bg-neutral-800 px-2 py-1.5 text-xs">Players</button>
+          <button type="button" onClick={() => setHqOpen((open) => !open)} className="rounded border border-neutral-700 bg-neutral-800 px-2 py-1.5 text-xs">Voters</button>
+        </div>
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <div className="text-xs text-neutral-400">
             Turn {state.turn} · {active.name}'s turn
           </div>
@@ -413,7 +439,7 @@ export default function Game({ readOnly = false }: GameProps) {
                 ? "Discard down to your resource cap first"
                 : "End your turn"
             }
-            className="px-3 py-1.5 rounded-md bg-blue-700 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-white text-sm font-semibold"
+            className="whitespace-nowrap px-2 py-1.5 sm:px-3 rounded-md bg-blue-700 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-white text-xs sm:text-sm font-semibold"
           >
             {headlinesComplete ? "Next Player" : "End Turn"}
           </button>
@@ -443,12 +469,14 @@ export default function Game({ readOnly = false }: GameProps) {
       ) : null}
 
       {/* Main */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="min-h-0 flex-1 flex overflow-hidden">
+        {sidebarOpen ? <button type="button" aria-label="Close players panel" onClick={() => setSidebarOpen(false)} className="fixed inset-0 z-40 bg-black/65 sm:hidden" /> : null}
         {/* Resizable sidebar */}
         <aside
-          style={{ width: sidebarWidth }}
-          className="flex flex-col bg-neutral-950 border-r border-neutral-800 shrink-0 overflow-hidden"
+          style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
+          className={`${sidebarOpen ? "translate-x-0" : "-translate-x-full"} fixed inset-y-0 left-0 z-50 flex w-[min(86vw,320px)] flex-col overflow-hidden border-r border-neutral-800 bg-neutral-950 shadow-2xl transition-transform sm:static sm:z-auto sm:w-[var(--sidebar-width)] sm:translate-x-0 sm:shrink-0 sm:shadow-none`}
         >
+          <div className="flex items-center justify-between border-b border-neutral-800 p-3 sm:hidden"><span className="font-semibold">Players &amp; resources</span><button type="button" onClick={() => setSidebarOpen(false)} className="rounded px-2 py-1 text-neutral-300">✕</button></div>
           <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
             {state.players.map((p, i) => {
               const isActive = i === state.activePlayerIdx;
@@ -485,7 +513,7 @@ export default function Game({ readOnly = false }: GameProps) {
           onMouseDown={onResizeStart}
           onDoubleClick={() => setSidebarWidth(SIDEBAR_DEFAULT)}
           title="Drag to resize · double-click to reset"
-          className="w-1.5 shrink-0 cursor-col-resize bg-neutral-800 hover:bg-blue-500/70 active:bg-blue-500 transition-colors"
+          className="hidden w-1.5 shrink-0 cursor-col-resize bg-neutral-800 hover:bg-blue-500/70 active:bg-blue-500 transition-colors sm:block"
         />
 
         {/* Map area — also hosts the floating placement panel when pending. */}
@@ -494,10 +522,12 @@ export default function Game({ readOnly = false }: GameProps) {
             ref={mapRef}
             state={state}
             selectableSlots={selectableSlots}
+            onSlotClick={selectedPegKey ? placeSelectedPeg : undefined}
             draftPegs={draftPegs}
             onDraftPegPointerDown={startDrag}
           />
-          <div className="absolute top-3 right-3 z-10 w-[320px] max-w-[45%] shadow-xl">
+          <div className={`${hqOpen ? "block" : "hidden"} absolute inset-x-3 top-3 z-30 shadow-xl sm:left-auto sm:right-3 sm:block sm:w-[320px] sm:max-w-[45%]`}>
+            <button type="button" aria-label="Close voters panel" onClick={() => setHqOpen(false)} className="absolute right-1 top-1 z-10 rounded bg-black/70 px-2 py-1 text-xs sm:hidden">✕</button>
             <HqMat
               state={state}
               onInfluenceClick={(openIdx) =>
@@ -506,13 +536,15 @@ export default function Game({ readOnly = false }: GameProps) {
             />
           </div>
           {pending > 0 && !readOnly ? (
-            <div className="absolute top-3 left-3 z-20">
+            <div className="absolute bottom-3 left-3 z-20 sm:bottom-auto sm:top-3">
               <FloatingPlacementPanel
                 ref={panelRef}
                 pegs={pegList}
                 draftedPegKeys={draftedPegKeys}
                 draggingPegKey={dragging?.pegKey ?? null}
+                selectedPegKey={selectedPegKey}
                 onPegPointerDown={startDrag}
+                onPegSelect={selectPeg}
                 onSave={savePlacements}
                 onReset={resetPlacements}
               />

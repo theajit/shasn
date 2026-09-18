@@ -26,7 +26,7 @@ export default function ActionBar({
   const btn =
     "px-3 py-2 rounded-md border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-white text-sm";
   return (
-    <div className="flex flex-wrap items-center gap-2 p-3 border-t border-neutral-800 bg-neutral-950">
+    <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-t border-neutral-800 bg-neutral-950 p-2 sm:flex-wrap sm:gap-2 sm:p-3">
       <button type="button" onClick={onGerrymander} disabled={!inActionsPhase} className={btn}>
         Gerrymander
       </button>
@@ -36,7 +36,7 @@ export default function ActionBar({
       <button type="button" onClick={onPlayConspiracy} disabled={!canPlayConspiracy} className={btn}>
         Play Conspiracy
       </button>
-      {trailing ? <div className="ml-auto">{trailing}</div> : null}
+      {trailing ? <div className="ml-auto shrink-0">{trailing}</div> : null}
     </div>
   );
 }
