@@ -70,7 +70,7 @@ function pinMatches(player: ServerPlayer, pin: string) {
 }
 
 function identity(room: Room, player: ServerPlayer, reconnectPin: string): RoomIdentity {
-  return { roomCode: room.code, playerId: player.id, reconnectToken: player.reconnectToken, reconnectPin };
+  return { roomCode: room.code, playerId: player.id, playerName: player.name, reconnectToken: player.reconnectToken, reconnectPin };
 }
 
 io.on("connection", (socket) => {

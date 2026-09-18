@@ -1,10 +1,11 @@
 import { hasSavedGame } from "@/store/gameStore";
-import { hasRoomSession, useRoomStore } from "@/store/roomStore";
+import { getSavedRoomSession, useRoomStore } from "@/store/roomStore";
 
 export default function PlayMenu() {
   const chooseLocal = useRoomStore((state) => state.chooseLocal);
   const resumeRoom = useRoomStore((state) => state.resumeRoom);
   const backToMenu = useRoomStore((state) => state.backToMenu);
+  const savedRoom = getSavedRoomSession();
   const chooseOnline = (lobbyIntent: "create" | "join") =>
     useRoomStore.setState({
       mode: "online",
@@ -20,6 +21,15 @@ export default function PlayMenu() {
         <div className="text-xs uppercase tracking-[0.35em] text-red-400">The political strategy game</div>
         <h1 className="mt-3 text-5xl font-black">SHASN Online</h1>
         <p className="mx-auto mt-4 max-w-xl text-neutral-400">Play around one table or create a private room for friends joining from anywhere.</p>
+        {savedRoom ? (
+          <button type="button" onClick={resumeRoom} className="mx-auto mt-6 flex w-full max-w-md items-center justify-between rounded-xl border border-blue-700/70 bg-blue-950/40 px-5 py-4 text-left transition hover:border-blue-400 hover:bg-blue-950/70">
+            <span>
+              <span className="block text-lg font-bold">Continue as {savedRoom.playerName || "previous player"}</span>
+              <span className="mt-1 block text-xs uppercase tracking-widest text-blue-300">Room {savedRoom.roomCode}</span>
+            </span>
+            <span aria-hidden className="text-2xl text-blue-300">→</span>
+          </button>
+        ) : null}
         <div className="mt-10 grid gap-4 sm:grid-cols-3">
           <button type="button" onClick={chooseLocal} className="rounded-xl border border-neutral-700 bg-neutral-900 p-6 text-left hover:border-neutral-500">
             <span className="block text-xl font-bold">Pass & play</span>
@@ -35,9 +45,6 @@ export default function PlayMenu() {
             <span className="mt-2 block text-sm text-neutral-400">Enter a room code and join an existing game.</span>
           </button>
         </div>
-        {hasRoomSession() ? (
-          <button type="button" onClick={resumeRoom} className="mt-5 text-sm text-blue-300 underline hover:text-blue-200">Reconnect to my last room</button>
-        ) : null}
         <button type="button" onClick={backToMenu} className="sr-only">Menu</button>
       </div>
     </main>
