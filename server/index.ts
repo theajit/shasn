@@ -7,7 +7,7 @@ import { Server } from "socket.io";
 import { createInitialState } from "../src/engine/state";
 import { applyAction } from "../src/engine/reducer";
 import type { PlayerColor, PlayerId } from "../src/engine/types";
-import type { ClientActionPayload, RoomAck, RoomIdentity, RoomSnapshot, StartRoomOptions } from "../src/online/types";
+import type { ClientActionPayload, RoomAck, RoomIdentity, RoomSnapshot, StartRoomOptions, TradeProposalPayload, TradeResponsePayload } from "../src/online/types";
 
 interface ServerPlayer {
   id: PlayerId;
@@ -23,6 +23,7 @@ interface Room {
   code: string;
   players: ServerPlayer[];
   game: RoomSnapshot["game"];
+  pendingTrade: RoomSnapshot["pendingTrade"];
 }
 
 const rooms = new Map<string, Room>();
@@ -44,6 +45,7 @@ function snapshot(room: Room): RoomSnapshot {
     code: room.code,
     players: room.players.map(({ id, name, color, connected, isHost }) => ({ id, name, color, connected, isHost })),
     game: room.game,
+    pendingTrade: room.pendingTrade,
   };
 }
 
@@ -57,7 +59,7 @@ function identity(room: Room, player: ServerPlayer): RoomIdentity {
 
 io.on("connection", (socket) => {
   socket.on("room:create", ({ name, color }: { name: string; color: PlayerColor }, ack: (result: RoomAck) => void) => {
-    const room: Room = { code: makeCode(), players: [], game: null };
+    const room: Room = { code: makeCode(), players: [], game: null, pendingTrade: null };
     const player: ServerPlayer = {
       id: "p1", name: name.trim() || "Host", color, connected: true, isHost: true,
       socketId: socket.id, reconnectToken: randomBytes(24).toString("hex"),
@@ -116,11 +118,54 @@ io.on("connection", (socket) => {
     const room = rooms.get(payload.roomCode);
     const player = room?.players.find((item) => item.id === payload.playerId && item.socketId === socket.id);
     if (!room?.game || !player) return ack({ ok: false, error: "Game room unavailable" });
+    if (room.pendingTrade) return ack({ ok: false, error: "Waiting for a trade response" });
     const active = room.game.players[room.game.activePlayerIdx];
     if (active.id !== player.id) return ack({ ok: false, error: `Waiting for ${active.name}'s turn` });
     const result = applyAction(room.game, payload.action);
     if (!result.ok) return ack({ ok: false, error: result.error });
     room.game = result.state;
+    ack({ ok: true });
+    broadcast(room);
+  });
+
+  socket.on("trade:propose", (payload: TradeProposalPayload, ack: (result: RoomAck) => void) => {
+    const room = rooms.get(payload.roomCode);
+    const player = room?.players.find((item) => item.id === payload.playerId && item.socketId === socket.id);
+    if (!room?.game || !player) return ack({ ok: false, error: "Game room unavailable" });
+    if (room.pendingTrade) return ack({ ok: false, error: "Another trade is awaiting a response" });
+    const active = room.game.players[room.game.activePlayerIdx];
+    if (active.id !== player.id) return ack({ ok: false, error: `Waiting for ${active.name}'s turn` });
+    if (!room.players.some((item) => item.id === payload.partnerId)) return ack({ ok: false, error: "Trade partner not found" });
+    const action = { t: "trade" as const, withPlayerId: payload.partnerId, give: payload.give, receive: payload.receive };
+    const validation = applyAction(room.game, action);
+    if (!validation.ok) return ack({ ok: false, error: validation.error });
+    room.pendingTrade = {
+      id: randomBytes(12).toString("hex"),
+      proposerId: player.id,
+      partnerId: payload.partnerId,
+      give: payload.give,
+      receive: payload.receive,
+    };
+    ack({ ok: true });
+    broadcast(room);
+  });
+
+  socket.on("trade:respond", (payload: TradeResponsePayload, ack: (result: RoomAck) => void) => {
+    const room = rooms.get(payload.roomCode);
+    const player = room?.players.find((item) => item.id === payload.playerId && item.socketId === socket.id);
+    const trade = room?.pendingTrade;
+    if (!room?.game || !player || !trade || trade.id !== payload.tradeId) return ack({ ok: false, error: "Trade proposal is no longer available" });
+    if (trade.partnerId !== player.id) return ack({ ok: false, error: "Only the selected trade partner can respond" });
+    if (payload.accept) {
+      const result = applyAction(room.game, { t: "trade", withPlayerId: trade.partnerId, give: trade.give, receive: trade.receive });
+      if (!result.ok) {
+        room.pendingTrade = null;
+        broadcast(room);
+        return ack({ ok: false, error: result.error });
+      }
+      room.game = result.state;
+    }
+    room.pendingTrade = null;
     ack({ ok: true });
     broadcast(room);
   });

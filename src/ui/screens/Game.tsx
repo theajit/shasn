@@ -30,7 +30,8 @@ import FloatingPlacementPanel, {
   type PendingPeg,
 } from "@/ui/components/FloatingPlacementPanel";
 import { PLAYER_COLOR_HEX } from "@/ui/components/PlayerColorSwatch";
-import type { Ideologue, PlayerColor } from "@/engine/types";
+import type { Ideologue, PlayerColor, TradeBundle } from "@/engine/types";
+import { useRoomStore } from "@/store/roomStore";
 
 type ModalKind =
   | null
@@ -45,6 +46,15 @@ const SIDEBAR_MIN = 220;
 const SIDEBAR_MAX_FRACTION = 0.2;          // 20% of viewport width
 const SIDEBAR_DEFAULT = 280;
 const SIDEBAR_STORAGE_KEY = "shashn-online:sidebarWidth";
+
+function describeTradeBundle(bundle: TradeBundle): string {
+  const resources = Object.entries(bundle.resources ?? {})
+    .filter(([, amount]) => (amount ?? 0) > 0)
+    .map(([resource, amount]) => `${amount} ${resource}`);
+  const cardCount = bundle.conspiracyCardIds?.length ?? 0;
+  if (cardCount > 0) resources.push(`${cardCount} conspiracy card${cardCount === 1 ? "" : "s"}`);
+  return resources.join(", ") || "nothing";
+}
 
 function sidebarMaxWidth(): number {
   if (typeof window === "undefined") return 560;
@@ -64,11 +74,19 @@ function readSidebarWidth(): number {
 type PegKey = string;  // `${bundleIdx}:${voterIdx}`
 type CellKey = string; // `${zoneId},${slotIdx}`
 
-export default function Game() {
+interface GameProps {
+  readOnly?: boolean;
+}
+
+export default function Game({ readOnly = false }: GameProps) {
   const state = useGameStore((s) => s.state)!;
   const dispatch = useDispatch();
   const lastError = useLastError();
   const clearError = useClearError();
+  const room = useRoomStore((s) => s.snapshot);
+  const identity = useRoomStore((s) => s.identity);
+  const respondToTrade = useRoomStore((s) => s.respondToTrade);
+  const pendingTrade = room?.pendingTrade;
 
   const [modal, setModal] = useState<ModalKind>(null);
 
@@ -216,7 +234,7 @@ export default function Game() {
   // Highlight set for the map — union of every valid cell an unplaced peg
   // could legitimately drop on.
   const selectableSlots = useMemo(() => {
-    if (pegList.length === 0) return undefined;
+    if (readOnly || pegList.length === 0) return undefined;
     const out: Record<string, number[]> = {};
     pegList.forEach((peg) => {
       if (draftedPegKeys.has(peg.key)) return;
@@ -233,7 +251,7 @@ export default function Game() {
       }
     });
     return out;
-  }, [pegList, draftedPegKeys, draftedCellKeys, lockedZoneByBundle, state.board.zones, state.zones]);
+  }, [readOnly, pegList, draftedPegKeys, draftedCellKeys, lockedZoneByBundle, state.board.zones, state.zones]);
 
   // Draft preview pegs for the map overlay.
   const draftPegs = useMemo(() => {
@@ -278,6 +296,7 @@ export default function Game() {
   // Start a drag — called from FloatingPlacementPanel or the draft overlay.
   const startDrag = useCallback(
     (pegKey: PegKey, e: React.PointerEvent) => {
+      if (readOnly) return;
       const peg = pegList.find((p) => p.key === pegKey);
       if (!peg) return;
       setDragging({
@@ -288,7 +307,7 @@ export default function Game() {
         canDrop: false,
       });
     },
-    [pegList],
+    [readOnly, pegList],
   );
 
   // Global pointer move / up — drives the ghost peg and resolves the drop.
@@ -382,7 +401,7 @@ export default function Game() {
           <button
             type="button"
             onClick={() => dispatch({ t: "endTurn" })}
-            disabled={!canEndTurn}
+            disabled={readOnly || !canEndTurn || !!pendingTrade}
             title={
               headlinesComplete
                 ? "Continue to the next player"
@@ -400,6 +419,28 @@ export default function Game() {
           </button>
         </div>
       </div>
+
+      {readOnly ? (
+        <div className="border-b border-blue-900 bg-blue-950/60 px-4 py-2 text-center text-sm text-blue-200">
+          Viewing {active.name}&apos;s turn — the board updates live.
+        </div>
+      ) : null}
+
+      {pendingTrade ? (
+        <div className="border-b border-amber-800 bg-amber-950/70 px-4 py-3 text-center text-sm text-amber-100">
+          {pendingTrade.partnerId === identity?.playerId ? (
+            <span className="inline-flex flex-wrap items-center justify-center gap-3">
+              <span>
+                {state.players.find((p) => p.id === pendingTrade.proposerId)?.name ?? "A player"} gives {describeTradeBundle(pendingTrade.give)}; you give {describeTradeBundle(pendingTrade.receive)}.
+              </span>
+              <button type="button" onClick={() => respondToTrade(pendingTrade.id, true)} className="rounded bg-emerald-700 px-3 py-1 font-semibold hover:bg-emerald-600">Accept</button>
+              <button type="button" onClick={() => respondToTrade(pendingTrade.id, false)} className="rounded border border-amber-700 px-3 py-1 hover:bg-amber-900">Reject</button>
+            </span>
+          ) : (
+            <span>Waiting for {state.players.find((p) => p.id === pendingTrade.partnerId)?.name ?? "the trade partner"} to approve the trade.</span>
+          )}
+        </div>
+      ) : null}
 
       {/* Main */}
       <div className="flex-1 flex overflow-hidden">
@@ -419,7 +460,7 @@ export default function Game() {
                     <IdeologyCollection
                       player={p}
                       onUsePower={(ideologue, level) =>
-                        setModal({ kind: "power", ideologue, level })
+                        !readOnly && setModal({ kind: "power", ideologue, level })
                       }
                     />
                   ) : null}
@@ -431,7 +472,7 @@ export default function Game() {
             <ConspiracyBuyPanel
               state={state}
               onBuyConspiracy={() => setModal({ kind: "buyConspiracy" })}
-              disabled={!inActions}
+              disabled={readOnly || !inActions || !!pendingTrade}
             />
           </div>
         </aside>
@@ -460,11 +501,11 @@ export default function Game() {
             <HqMat
               state={state}
               onInfluenceClick={(openIdx) =>
-                inActions && setModal({ kind: "influence", openIdx })
+                !readOnly && !pendingTrade && inActions && setModal({ kind: "influence", openIdx })
               }
             />
           </div>
-          {pending > 0 ? (
+          {pending > 0 && !readOnly ? (
             <div className="absolute top-3 left-3 z-20">
               <FloatingPlacementPanel
                 ref={panelRef}
@@ -484,8 +525,8 @@ export default function Game() {
         onGerrymander={() => setModal({ kind: "gerry" })}
         onTrade={() => setModal({ kind: "trade" })}
         onPlayConspiracy={() => setModal({ kind: "conspiracy" })}
-        canPlayConspiracy={active.conspiracyHand.length > 0}
-        inActionsPhase={inActions}
+        canPlayConspiracy={!readOnly && !pendingTrade && active.conspiracyHand.length > 0}
+        inActionsPhase={!readOnly && !pendingTrade && inActions}
         trailing={<DeckStats state={state} />}
       />
 
@@ -531,11 +572,11 @@ export default function Game() {
       ) : null}
 
       {/* Forced modals (highest priority) */}
-      {state.phase === "ideology" ? <IdeologyCardModal state={state} /> : null}
-      {state.phase === "headlines" && state.pendingHeadlines > 0 ? (
+      {!readOnly && state.phase === "ideology" ? <IdeologyCardModal state={state} /> : null}
+      {!readOnly && state.phase === "headlines" && state.pendingHeadlines > 0 ? (
         <HeadlineModal state={state} />
       ) : null}
-      {overCap ? <ResourceDiscardModal state={state} /> : null}
+      {!readOnly && overCap ? <ResourceDiscardModal state={state} /> : null}
 
       {/* Optional modals */}
       {modal?.kind === "influence" ? (

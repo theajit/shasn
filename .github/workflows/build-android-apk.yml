@@ -1,0 +1,73 @@
+name: Build Android APK
+
+# Builds an installable debug APK and publishes it to a rolling "latest"
+# GitHub Release. The newest build is always available at:
+# https://github.com/theajit/shasn/releases/tag/latest/download/shasn.apk
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        env:
+          VITE_ROOM_SERVER_URL: ${{ vars.VITE_ROOM_SERVER_URL }}
+        run: npm run build
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ""
+
+      - name: Install Android SDK packages (API 36)
+        run: sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Sync web build into the Android project
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk shasn.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shasn-android-apk
+          path: shasn.apk
+          if-no-files-found: error
+
+      - name: Publish to the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create latest shasn.apk \
+            --title "SHASN — latest Android build" \
+            --notes "Latest APK, built automatically from commit ${{ github.sha }}. Download **shasn.apk** below and sideload it on Android."

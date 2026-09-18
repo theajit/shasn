@@ -20,16 +20,15 @@ export default function App() {
   if (mode === "online" && !room?.game) return <OnlineLobby />;
   if (!state) return mode === "online" ? <OnlineLobby /> : <Setup />;
   const isMyOnlineTurn = mode !== "online" || state.players[state.activePlayerIdx]?.id === identity?.playerId;
-  if (!isMyOnlineTurn && state.phase !== "ended") return <OnlineWaiting />;
   switch (state.phase) {
     case "setup":
       return <Setup />;
     case "handoff":
-      return <Handoff />;
+      return !isMyOnlineTurn ? <OnlineWaiting /> : <Handoff />;
     case "ideology":
     case "actions":
     case "headlines":
-      return <Game />;
+      return <Game readOnly={!isMyOnlineTurn} />;
     case "ended":
       return <EndGame />;
     default: {
