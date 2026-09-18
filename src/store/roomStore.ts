@@ -18,6 +18,7 @@ interface RoomStore {
   backToMenu: () => void;
   createRoom: (name: string, color: PlayerColor) => void;
   joinRoom: (code: string, name: string, color: PlayerColor) => void;
+  rejoinRoom: (code: string, name: string, pin: string) => void;
   resumeRoom: () => void;
   startRoom: (options: StartRoomOptions) => void;
   dispatchOnline: (action: Action) => void;
@@ -73,6 +74,10 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   joinRoom: (code, name, color) => {
     set({ connecting: true, error: null });
     getSocket().emit("room:join", { code: code.toUpperCase(), name, color }, acceptAck);
+  },
+  rejoinRoom: (code, name, pin) => {
+    set({ connecting: true, error: null });
+    getSocket().emit("room:rejoin", { code: code.toUpperCase(), name, pin }, acceptAck);
   },
   resumeRoom: () => {
     const saved = readIdentity();
