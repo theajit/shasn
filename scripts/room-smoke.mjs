@@ -18,10 +18,15 @@ const wrongPin = await emit(returningGuest, "room:rejoin", { code: joined.identi
 if (wrongPin.ok) throw new Error("Incorrect reconnect PIN was accepted");
 const rejoined = await emit(returningGuest, "room:rejoin", { code: joined.identity.roomCode, name: "Guest", pin: joined.identity.reconnectPin });
 if (!rejoined.ok || rejoined.identity.playerId !== joined.identity.playerId) throw new Error(rejoined.error ?? "Guest did not reclaim the same seat");
-const rejected = await emit(returningGuest, "game:action", { roomCode: rejoined.identity.roomCode, playerId: rejoined.identity.playerId, action: { t: "acknowledgeHandoff" } });
+returningGuest.disconnect();
+await new Promise((resolve) => setTimeout(resolve, 100));
+const resumedGuest = io(roomServer);
+const resumed = await emit(resumedGuest, "room:resume", rejoined.identity);
+if (!resumed.ok || resumed.identity.playerName !== "Guest") throw new Error(resumed.error ?? "Saved room session did not resume");
+const rejected = await emit(resumedGuest, "game:action", { roomCode: resumed.identity.roomCode, playerId: resumed.identity.playerId, action: { t: "acknowledgeHandoff" } });
 if (rejected.ok) throw new Error("Non-active player action was accepted");
 const accepted = await emit(host, "game:action", { roomCode: created.identity.roomCode, playerId: created.identity.playerId, action: { t: "acknowledgeHandoff" } });
 if (!accepted.ok) throw new Error(accepted.error);
-console.log(`room ${created.identity.roomCode}: create, join, PIN rejoin, start, and turn authorization passed`);
+console.log(`room ${created.identity.roomCode}: create, join, PIN rejoin, saved-session resume, start, and turn authorization passed`);
 host.disconnect();
-returningGuest.disconnect();
+resumedGuest.disconnect();

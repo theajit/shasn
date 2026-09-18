@@ -26,6 +26,7 @@ export interface RoomSnapshot {
 export interface RoomIdentity {
   roomCode: string;
   playerId: PlayerId;
+  playerName: string;
   reconnectToken: string;
   reconnectPin: string;
 }

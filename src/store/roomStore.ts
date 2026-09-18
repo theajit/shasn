@@ -37,6 +37,18 @@ function getSocket() {
     useRoomStore.setState({ snapshot, connecting: false, error: null });
     useGameStore.getState().replaceState(snapshot.game);
   });
+  socket.on("disconnect", () => {
+    if (useRoomStore.getState().mode === "online") {
+      useRoomStore.setState({ connecting: true, error: null });
+    }
+  });
+  socket.io.on("reconnect", () => {
+    const state = useRoomStore.getState();
+    const saved = state.identity ?? readIdentity();
+    if (state.mode !== "online" || !saved) return;
+    useRoomStore.setState({ connecting: true, error: null });
+    socket?.emit("room:resume", saved, acceptAck);
+  });
   socket.on("connect_error", () => useRoomStore.setState({ connecting: false, error: "Could not connect to the room server" }));
   return socket;
 }
@@ -124,4 +136,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
 export function hasRoomSession() {
   return readIdentity() !== null;
+}
+
+export function getSavedRoomSession() {
+  return readIdentity();
 }
