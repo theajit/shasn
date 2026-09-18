@@ -1,13 +1,13 @@
 import express from "express";
 import { createServer } from "node:http";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt, scryptSync, timingSafeEqual } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Server } from "socket.io";
 import { createInitialState } from "../src/engine/state";
 import { applyAction } from "../src/engine/reducer";
 import type { PlayerColor, PlayerId } from "../src/engine/types";
-import type { ClientActionPayload, RoomAck, RoomIdentity, RoomSnapshot, StartRoomOptions, TradeProposalPayload, TradeResponsePayload } from "../src/online/types";
+import type { ClientActionPayload, RejoinRoomPayload, RoomAck, RoomIdentity, RoomSnapshot, StartRoomOptions, TradeProposalPayload, TradeResponsePayload } from "../src/online/types";
 
 interface ServerPlayer {
   id: PlayerId;
@@ -17,6 +17,8 @@ interface ServerPlayer {
   isHost: boolean;
   socketId: string;
   reconnectToken: string;
+  reconnectPinHash: Buffer;
+  reconnectPinSalt: Buffer;
 }
 
 interface Room {
@@ -53,21 +55,37 @@ function broadcast(room: Room) {
   io.to(room.code).emit("room:snapshot", snapshot(room));
 }
 
-function identity(room: Room, player: ServerPlayer): RoomIdentity {
-  return { roomCode: room.code, playerId: player.id, reconnectToken: player.reconnectToken };
+function makeReconnectPin() {
+  return randomInt(0, 100_000_000).toString().padStart(8, "0");
+}
+
+function pinCredentials(pin: string) {
+  const salt = randomBytes(16);
+  return { reconnectPinSalt: salt, reconnectPinHash: scryptSync(pin, salt, 32) };
+}
+
+function pinMatches(player: ServerPlayer, pin: string) {
+  const candidate = scryptSync(pin, player.reconnectPinSalt, 32);
+  return timingSafeEqual(candidate, player.reconnectPinHash);
+}
+
+function identity(room: Room, player: ServerPlayer, reconnectPin: string): RoomIdentity {
+  return { roomCode: room.code, playerId: player.id, reconnectToken: player.reconnectToken, reconnectPin };
 }
 
 io.on("connection", (socket) => {
   socket.on("room:create", ({ name, color }: { name: string; color: PlayerColor }, ack: (result: RoomAck) => void) => {
     const room: Room = { code: makeCode(), players: [], game: null, pendingTrade: null };
+    const reconnectPin = makeReconnectPin();
     const player: ServerPlayer = {
       id: "p1", name: name.trim() || "Host", color, connected: true, isHost: true,
       socketId: socket.id, reconnectToken: randomBytes(24).toString("hex"),
+      ...pinCredentials(reconnectPin),
     };
     room.players.push(player);
     rooms.set(room.code, room);
     socket.join(room.code);
-    ack({ ok: true, identity: identity(room, player) });
+    ack({ ok: true, identity: identity(room, player, reconnectPin) });
     broadcast(room);
   });
 
@@ -77,25 +95,44 @@ io.on("connection", (socket) => {
     if (room.game) return ack({ ok: false, error: "This game has already started" });
     if (room.players.length >= 5) return ack({ ok: false, error: "Room is full" });
     if (room.players.some((player) => player.color === color)) return ack({ ok: false, error: "That colour is already taken" });
+    if (room.players.some((player) => player.name.trim().toLocaleLowerCase() === name.trim().toLocaleLowerCase())) return ack({ ok: false, error: "That display name is already in use" });
+    const reconnectPin = makeReconnectPin();
     const player: ServerPlayer = {
       id: `p${room.players.length + 1}`, name: name.trim() || `Player ${room.players.length + 1}`,
       color, connected: true, isHost: false, socketId: socket.id,
       reconnectToken: randomBytes(24).toString("hex"),
+      ...pinCredentials(reconnectPin),
     };
     room.players.push(player);
     socket.join(room.code);
-    ack({ ok: true, identity: identity(room, player) });
+    ack({ ok: true, identity: identity(room, player, reconnectPin) });
     broadcast(room);
   });
 
-  socket.on("room:resume", ({ roomCode, playerId, reconnectToken }: RoomIdentity, ack: (result: RoomAck) => void) => {
+  socket.on("room:resume", ({ roomCode, playerId, reconnectToken, reconnectPin }: RoomIdentity, ack: (result: RoomAck) => void) => {
     const room = rooms.get(roomCode);
     const player = room?.players.find((item) => item.id === playerId && item.reconnectToken === reconnectToken);
     if (!room || !player) return ack({ ok: false, error: "Room session expired" });
     player.connected = true;
     player.socketId = socket.id;
     socket.join(room.code);
-    ack({ ok: true, identity: identity(room, player) });
+    ack({ ok: true, identity: identity(room, player, reconnectPin) });
+    socket.emit("room:snapshot", snapshot(room));
+    broadcast(room);
+  });
+
+  socket.on("room:rejoin", ({ code, name, pin }: RejoinRoomPayload, ack: (result: RoomAck) => void) => {
+    const room = rooms.get(code.trim().toUpperCase());
+    if (!room) return ack({ ok: false, error: "Room not found" });
+    const normalizedName = name.trim().toLocaleLowerCase();
+    const player = room.players.find((item) => item.name.trim().toLocaleLowerCase() === normalizedName);
+    if (!player || !/^\d{8}$/.test(pin) || !pinMatches(player, pin)) return ack({ ok: false, error: "Name or reconnect PIN is incorrect" });
+    if (player.connected) return ack({ ok: false, error: "That player is already connected" });
+    player.connected = true;
+    player.socketId = socket.id;
+    player.reconnectToken = randomBytes(24).toString("hex");
+    socket.join(room.code);
+    ack({ ok: true, identity: identity(room, player, pin) });
     socket.emit("room:snapshot", snapshot(room));
     broadcast(room);
   });

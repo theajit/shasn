@@ -27,6 +27,7 @@ export interface RoomIdentity {
   roomCode: string;
   playerId: PlayerId;
   reconnectToken: string;
+  reconnectPin: string;
 }
 
 export interface RoomAck {
@@ -44,6 +45,12 @@ export interface ClientActionPayload {
   roomCode: string;
   playerId: PlayerId;
   action: Action;
+}
+
+export interface RejoinRoomPayload {
+  code: string;
+  name: string;
+  pin: string;
 }
 
 export interface TradeProposalPayload {
