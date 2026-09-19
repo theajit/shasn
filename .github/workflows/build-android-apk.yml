@@ -104,7 +104,10 @@ jobs:
           cp android/app/build/outputs/bundle/release/app-release.aab shasn.aab
 
       - name: Verify APK signature
-        run: apksigner verify --verbose --print-certs shasn.apk
+        run: |
+          APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          test -x "$APKSIGNER" || { echo "apksigner was not found at $APKSIGNER"; find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name 'apksigner*' -print; exit 1; }
+          "$APKSIGNER" verify --verbose --print-certs shasn.apk
 
       - name: Verify AAB signature
         run: jarsigner -verify -strict -certs shasn.aab
