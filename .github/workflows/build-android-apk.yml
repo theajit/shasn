@@ -96,6 +96,8 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           chmod +x ./gradlew
+          export ANDROID_VERSION_CODE=$((GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT))
+          echo "Building Android version code $ANDROID_VERSION_CODE"
           ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace
 
       - name: Collect signed artifacts
