@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">SHASN</string>
     <string name="title_activity_main">SHASN</string>
-    <string name="package_name">com.theajit.shasn</string>
-    <string name="custom_url_scheme">com.theajit.shasn</string>
+    <string name="package_name">com.ajit.shasn</string>
+    <string name="custom_url_scheme">com.ajit.shasn</string>
 </resources>

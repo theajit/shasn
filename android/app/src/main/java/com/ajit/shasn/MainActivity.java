@@ -1,4 +1,4 @@
-package com.theajit.shasn;
+package com.ajit.shasn;
 
 import com.getcapacitor.BridgeActivity;
 

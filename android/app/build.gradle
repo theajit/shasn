@@ -19,10 +19,10 @@ if (isReleaseBuild) {
 }
 
 android {
-    namespace = "com.theajit.shasn"
+    namespace = "com.ajit.shasn"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.theajit.shasn"
+        applicationId "com.ajit.shasn"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
